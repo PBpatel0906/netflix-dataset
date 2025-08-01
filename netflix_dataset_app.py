@@ -6,14 +6,10 @@ import matplotlib.pyplot as plt
 st.set_page_config(page_title="Netflix Dashboard", layout="wide")
 st.title("🎬 Netflix Interactive Data Dashboard")
 
-# --- Sidebar: File Upload ---
-st.sidebar.title("Upload Your Dataset")
-uploaded_file = st.sidebar.file_uploader("Upload Netflix CSV", type=["csv"])
-
-# --- Load and Process Data ---
+# --- Load Data from local file ---
 @st.cache_data
-def load_data(file):
-    df = pd.read_csv(file)
+def load_data():
+    df = pd.read_csv('netflix_titles.csv')
     df['date_added'] = pd.to_datetime(df['date_added'], errors='coerce')
     df['year_added'] = df['date_added'].dt.year
     df['month_added'] = df['date_added'].dt.month_name()
@@ -22,11 +18,11 @@ def load_data(file):
     df['cast'] = df['cast'].astype(str)
     return df
 
-if uploaded_file:
-    df = load_data(uploaded_file)
-    st.success("✅ File uploaded and data loaded successfully!")
+try:
+    df = load_data()
+    st.success("✅ Dataset loaded successfully!")
 
-    # --- Dashboard Sections ---
+    # --- Tabs for Dashboard Sections ---
     tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
         "📊 Overview", 
         "📈 Year Trends", 
@@ -123,5 +119,5 @@ if uploaded_file:
         st.info(f"🎞 Average Movie Duration: {movies_df['minutes'].mean():.2f} minutes")
         st.info(f"📺 Average Number of TV Seasons: {tv_df['seasons'].mean():.2f}")
 
-else:
-    st.warning("📂 Please upload the netflix_titles.csv file to get started.")
+except FileNotFoundError:
+    st.error("❌ File 'netflix_titles.csv' not found in the current folder.")
