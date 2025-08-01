@@ -20,7 +20,7 @@ def load_data():
 
 try:
     df = load_data()
-    st.success("✅ Dataset loaded successfully!")
+
 
     # --- Tabs for Dashboard Sections ---
     tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
@@ -121,3 +121,4 @@ try:
 
 except FileNotFoundError:
     st.error("❌ File 'netflix_titles.csv' not found in the current folder.")
+
