@@ -1,178 +1,85 @@
+# netflix_dashboard.py
 
 import streamlit as st
 import pandas as pd
-import seaborn as sns
-import matplotlib.pyplot as plt
+import plotly.express as px
 
+# Set page config
 st.set_page_config(page_title="Netflix Dashboard", layout="wide")
-st.title("🎬 Netflix Interactive Data Dashboard")
 
-# --- Load Data from local file ---
+# Load data
 @st.cache_data
 def load_data():
-    df = pd.read_csv('netflix_titles.csv')
-    df['date_added'] = pd.to_datetime(df['date_added'], errors='coerce')
+    df = pd.read_csv("netflix_titles.csv")
+    df['date_added'] = pd.to_datetime(df['date_added'])
     df['year_added'] = df['date_added'].dt.year
-    df['month_added'] = df['date_added'].dt.month_name()
-    df['quarter_added'] = df['date_added'].dt.quarter
-    df['listed_in'] = df['listed_in'].astype(str)
-    df['cast'] = df['cast'].astype(str)
+    df['month_added'] = df['date_added'].dt.month
     return df
 
-try:
-    df = load_data()
-    st.success("✅ Dataset loaded successfully!")
+df = load_data()
 
-    # --- Tabs for Dashboard Sections ---
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
-        "📊 Overview", 
-        "📈 Year Trends", 
-        "🌍 Country & Type", 
-        "🎭 Genres & Actors", 
-        "🕒 Time Trends", 
-        "🎥 Durations",
-        "🌏 Country Content View"
-    ])
+# ---- SIDEBAR ----
+st.sidebar.header("🔍 Filter Options")
+type_filter = st.sidebar.multiselect("Select Type", options=df['type'].unique(), default=df['type'].unique())
+country_filter = st.sidebar.multiselect("Select Country", options=df['country'].dropna().unique(), default=["United States", "India"])
+year_filter = st.sidebar.slider("Select Year Added", int(df['year_added'].min()), int(df['year_added'].max()), (2015, 2020))
 
-    # --- Tab 1: Overview ---
-    with tab1:
-        st.subheader("Dataset Preview")
-        st.dataframe(df.head(10))
+# Apply filters
+filtered_df = df[
+    (df['type'].isin(type_filter)) &
+    (df['country'].isin(country_filter)) &
+    (df['year_added'] >= year_filter[0]) &
+    (df['year_added'] <= year_filter[1])
+]
 
-        st.subheader("Top 10 Countries")
-        top_countries = df['country'].value_counts().head(10)
-        st.bar_chart(top_countries)
-        st.write("These are the top 10 countries by number of Netflix titles.")
+# ---- HEADER ----
+st.title("🎬 Netflix Data Dashboard")
+st.markdown("An interactive analysis of Netflix shows and movies dataset")
 
-        st.subheader("Content Type Distribution")
-        type_counts = df['type'].value_counts()
+# ---- TABS ----
+tab1, tab2, tab3 = st.tabs(["📊 Overview", "🌍 Content by Country", "📅 Trends Over Time"])
 
-        col1, col2 = st.columns([1, 2])
-        with col1:
-            fig, ax = plt.subplots(figsize=(4, 4))
-            type_counts.plot.pie(autopct='%1.1f%%', startangle=90, colors=['#66b3ff', '#ff9999'], ax=ax)
-            ax.set_ylabel("")
-            st.pyplot(fig)
-        with col2:
-            st.markdown("""
-            This pie chart shows the **proportion of Movies vs TV Shows** on Netflix.
-            - 📽️ Movies: single entries (e.g. films)
-            - 📺 TV Shows: series content
-            """)
+# ---- TAB 1: OVERVIEW ----
+with tab1:
+    st.subheader("Top Metrics")
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Total Titles", filtered_df.shape[0])
+    col2.metric("Movies", filtered_df[filtered_df['type'] == "Movie"].shape[0])
+    col3.metric("TV Shows", filtered_df[filtered_df['type'] == "TV Show"].shape[0])
 
-    # --- Tab 2: Year Trends ---
-    with tab2:
-        st.subheader("Content Added Per Year")
-        content_per_year = df['year_added'].value_counts().sort_index()
+    st.markdown("---")
+    st.subheader("🎭 Top Genres")
+    df['listed_in'] = df['listed_in'].fillna("Unknown")
+    all_genres = df['listed_in'].str.split(', ', expand=True).stack()
+    genre_counts = all_genres.value_counts().reset_index()
+    genre_counts.columns = ['Genre', 'Count']
 
-        fig, ax = plt.subplots()
-        sns.lineplot(x=content_per_year.index, y=content_per_year.values, marker='o', ax=ax, color='blue')
-        ax.set_title("Netflix Titles Added Each Year")
-        ax.set_xlabel("Year")
-        ax.set_ylabel("Number of Titles")
-        ax.grid(True)
-        st.pyplot(fig)
+    fig_genres = px.bar(genre_counts.head(10), x='Count', y='Genre', orientation='h', title="Top 10 Genres", height=400)
+    st.plotly_chart(fig_genres, use_container_width=True)
 
-        st.write("This line chart shows how many titles were **added to Netflix** each year.")
+# ---- TAB 2: CONTENT BY COUNTRY ----
+with tab2:
+    st.subheader("🌍 Number of Titles by Country")
 
-        st.subheader("Content Released Per Year")
-        release_trend = df['release_year'].value_counts().sort_index()
-        st.area_chart(release_trend)
-        st.write("This chart shows the release years of content, regardless of when it was added to Netflix.")
+    country_counts = filtered_df['country'].value_counts().head(15).reset_index()
+    country_counts.columns = ['Country', 'Count']
 
-    # --- Tab 3: Country and Type ---
-    with tab3:
-        st.subheader("Top Countries by Content Type")
-        grouped = df.groupby(['type', 'country']).size().reset_index(name='count')
-        top_grouped = grouped.sort_values(by='count', ascending=False).head(20)
+    fig_country = px.bar(country_counts, x='Country', y='Count', title="Top 15 Countries with Most Titles")
+    st.plotly_chart(fig_country, use_container_width=True)
 
-        fig, ax = plt.subplots(figsize=(12, 5))
-        sns.barplot(data=top_grouped, x='country', y='count', hue='type', ax=ax)
-        ax.set_title("Top Countries by Movies & TV Shows")
-        ax.set_xticklabels(ax.get_xticklabels(), rotation=45)
-        st.pyplot(fig)
+# ---- TAB 3: TRENDS OVER TIME ----
+with tab3:
+    st.subheader("📅 Titles Added Over the Years")
 
-        st.write("This bar chart shows the top countries producing Movies or TV Shows on Netflix.")
+    yearly = filtered_df.groupby('year_added').size().reset_index(name='Count')
+    fig_year = px.line(yearly, x='year_added', y='Count', markers=True, title="Content Added Per Year")
+    st.plotly_chart(fig_year, use_container_width=True)
 
-    # --- Tab 4: Genres and Actors ---
-    with tab4:
-        st.subheader("Top 10 Global Genres")
-        genres = df['listed_in'].str.split(', ').explode()
-        top_genres = genres.value_counts().head(10)
-        st.bar_chart(top_genres)
-        st.write("This chart shows the most common genres across all Netflix titles.")
+    st.subheader("📈 Monthly Additions")
+    monthly = filtered_df.groupby('month_added').size().reset_index(name='Count')
+    fig_month = px.bar(monthly, x='month_added', y='Count', title="Content Added by Month", labels={'month_added': 'Month'})
+    st.plotly_chart(fig_month, use_container_width=True)
 
-        st.subheader("Top 10 Global Actors")
-        actors = df['cast'].str.split(', ').explode()
-        top_actors = actors.value_counts().head(10)
-        fig, ax = plt.subplots()
-        top_actors.plot(kind='barh', ax=ax, color='skyblue')
-        ax.invert_yaxis()
-        st.pyplot(fig)
-        st.write("This chart shows the most frequently appearing actors in the dataset.")
-
-    # --- Tab 5: Month and Quarter Trends ---
-    with tab5:
-        st.subheader("Content Added by Month")
-        month_counts = df['month_added'].value_counts().reindex([
-            'January', 'February', 'March', 'April', 'May', 'June',
-            'July', 'August', 'September', 'October', 'November', 'December'
-        ])
-        st.bar_chart(month_counts)
-        st.write("This chart shows how many titles were added in each month across all years.")
-
-        st.subheader("Content Added by Quarter")
-        quarter_counts = df['quarter_added'].value_counts().sort_index()
-        st.bar_chart(quarter_counts)
-        st.write("This shows quarterly trends of content additions.")
-
-    # --- Tab 6: Durations ---
-    with tab6:
-        movies_df = df[df['type'] == 'Movie'].copy()
-        tv_df = df[df['type'] == 'TV Show'].copy()
-
-        movies_df['minutes'] = movies_df['duration'].str.extract('(\d+)').astype(float)
-        tv_df['seasons'] = tv_df['duration'].str.extract('(\d+)').astype(float)
-
-        st.subheader("Movie Duration Distribution")
-        fig, ax = plt.subplots()
-        sns.histplot(movies_df['minutes'].dropna(), bins=30, kde=True, ax=ax, color='crimson')
-        st.pyplot(fig)
-        st.write("This histogram shows how long Netflix movies typically are.")
-
-        st.subheader("TV Shows by Season Count")
-        fig, ax = plt.subplots()
-        sns.countplot(x=tv_df['seasons'].dropna(), ax=ax)
-        st.pyplot(fig)
-        st.write("This chart shows how many TV Shows have 1, 2, 3... seasons.")
-
-        st.info(f"🎞️ Average Movie Duration: {movies_df['minutes'].mean():.2f} minutes")
-        st.info(f"📺 Average TV Show Seasons: {tv_df['seasons'].mean():.2f}")
-
-    # --- Tab 7: Country Content View ---
-    with tab7:
-        st.subheader("Select Country/Countries")
-        countries = df['country'].dropna().unique().tolist()
-        countries.sort()
-
-        selected_countries = st.multiselect("Choose one or more countries", countries, default=["India"])
-
-        if selected_countries:
-            filtered = df[df['country'].isin(selected_countries)]
-
-            st.markdown("### 🧮 Content Type Distribution")
-            type_counts = filtered['type'].value_counts(normalize=True) * 100
-
-            fig, ax = plt.subplots(figsize=(4, 4))
-            type_counts.plot.pie(autopct='%1.1f%%', ax=ax, colors=['#ff9999','#66b3ff'])
-            ax.set_ylabel("")
-            st.pyplot(fig)
-
-            st.markdown("### 🎞️ Titles and Descriptions")
-            display_cols = ['title', 'type', 'description', 'country', 'release_year']
-            st.dataframe(filtered[display_cols].sort_values(by='release_year', ascending=False), use_container_width=True)
-        else:
-            st.info("Please select at least one country to view the data.")
-
-except FileNotFoundError:
-    st.error("❌ File 'netflix_titles.csv' not found in the current folder.")
+# ---- FOOTER ----
+st.markdown("---")
+st.markdown("Built with ❤ by [Your Name](https://www.linkedin.com/in/yourprofile) | Data Source: Netflix Dataset")
