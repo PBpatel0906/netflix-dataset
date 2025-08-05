@@ -82,4 +82,5 @@ with tab3:
 
 # ---- FOOTER ----
 st.markdown("---")
-st.markdown("Built with ❤ by [Your Name](https://www.linkedin.com/in/yourprofile) | Data Source: Netflix Dataset")
+
+#st.markdown("Built with ❤ by [Your Name](https://www.linkedin.com/in/yourprofile) | Data Source: Netflix Dataset")
