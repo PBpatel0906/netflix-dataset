@@ -11,7 +11,7 @@ st.set_page_config(page_title="Netflix Dashboard", layout="wide")
 @st.cache_data
 def load_data():
     df = pd.read_csv("netflix_titles.csv")
-    df['date_added'] = pd.to_datetime(df['date_added'])
+    df['date_added'] = pd.to_datetime(df['date_added'], errors='coerce)
     df['year_added'] = df['date_added'].dt.year
     df['month_added'] = df['date_added'].dt.month
     return df
@@ -84,3 +84,4 @@ with tab3:
 st.markdown("---")
 
 #st.markdown("Built with ❤ by [Your Name](https://www.linkedin.com/in/yourprofile) | Data Source: Netflix Dataset")
+
